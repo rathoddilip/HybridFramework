@@ -1,0 +1,40 @@
+# ============================================================
+# staging.yaml — Staging Environment Configuration (placeholders)
+# Override via -Denv=staging and system properties / CI secrets.
+# ============================================================
+
+browser: chrome
+headless: true
+remote: true
+gridUrl: http://selenium-grid:4444/wd/hub
+
+implicitWait: 8
+explicitWait: 20
+pageLoadTimeout: 45
+
+api:
+  baseUrl: https://staging-api.example.com
+  version: v1
+  timeout: 15000
+
+app:
+  baseUrl: https://staging-app.example.com
+
+auth:
+  origin: https://staging-app.example.com
+  referer: https://staging-app.example.com/
+  partnerUrl: https://staging-app.example.com
+  consent: false
+
+users:
+  admin:
+    username: admin@example.com
+    password: changeme
+  standard:
+    username: user@example.com
+    password: changeme
+
+retryCount: 2
+
+allure:
+  resultsDir: target/allure-results

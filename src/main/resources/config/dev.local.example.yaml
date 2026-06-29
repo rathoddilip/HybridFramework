@@ -1,0 +1,19 @@
+# Copy this file to dev.local.yaml and put your real local values there.
+# dev.local.yaml is gitignored and must not be committed.
+
+api:
+  baseUrl: https://your-api-host.example.com
+
+app:
+  baseUrl: https://your-app-host.example.com
+
+auth:
+  origin: https://your-app-host.example.com
+  referer: https://your-app-host.example.com/
+  partnerUrl: https://your-app-host.example.com
+  consent: false
+
+users:
+  admin:
+    username: "9000000000"
+    password: "000000"

@@ -1,0 +1,41 @@
+# ============================================================
+# dev.yaml - Dev Environment Configuration (safe placeholders)
+# Copy dev.local.example.yaml -> dev.local.yaml for real values.
+# dev.local.yaml is gitignored and must not be committed.
+# ============================================================
+
+browser: chrome
+headless: false
+remote: false
+gridUrl: http://localhost:4444/wd/hub
+
+implicitWait: 5
+explicitWait: 15
+pageLoadTimeout: 30
+
+api:
+  baseUrl: https://api.example.com
+
+app:
+  baseUrl: https://app.example.com
+
+auth:
+  origin: https://app.example.com
+  referer: https://app.example.com/
+  partnerUrl: https://app.example.com
+  consent: false
+
+users:
+  admin:
+    username: "9000000000"
+    password: "000000"
+  standard:
+    username: "9000000000"
+    password: "000000"
+
+retryCount: 0
+
+allure:
+  resultsDir: target/allure-results
+  autoGenerate: true
+  autoOpen: true

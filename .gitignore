@@ -1,0 +1,27 @@
+# Build output
+target/
+
+# Allure
+.allure/
+allure-history/
+allure-report/
+allure-results/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.junie/
+
+# Logs and recordings
+*.log
+recordings/
+
+# Local secrets — never commit real URLs, phones, OTPs, or tokens
+src/main/resources/config/*.local.yaml
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets.yaml
