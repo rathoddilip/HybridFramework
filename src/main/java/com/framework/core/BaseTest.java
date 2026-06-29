@@ -10,8 +10,6 @@ import org.openqa.selenium.WebDriver;
 import org.testng.ITestResult;
 import org.testng.annotations.*;
 
-import java.util.Optional;
-
 /**
  * BaseTest — Parent class for all TestNG test classes.
  *
@@ -49,17 +47,21 @@ public abstract class BaseTest {
     // ── Test Level ────────────────────────────────────────────────────────────
 
     @BeforeMethod(alwaysRun = true)
-    public void setUp(ITestResult result) {
+    @Parameters({"browser"})
+    public void setUp(ITestResult result, @Optional String browser) {
         log.info("--------------------------------------------------");
         log.info("  TEST START: [{}]", result.getMethod().getMethodName());
-        log.info("  Thread ID : {}", Optional.of(Thread.currentThread().getId()));
+        log.info("  Thread ID : {}", Thread.currentThread().getId());
         log.info("--------------------------------------------------");
 
         softly = new SoftAssertions();
 
         if (isWebTest()) {
+            DriverFactory.setBrowserOverride(browser);
             DriverFactory.initDriver();
-            log.info("WebDriver initialized for: [{}]", result.getMethod().getMethodName());
+            log.info("WebDriver initialized for: [{}] | browser: [{}]",
+                    result.getMethod().getMethodName(),
+                    browser != null ? browser : ConfigManager.get("browser", "chrome"));
         }
     }
 

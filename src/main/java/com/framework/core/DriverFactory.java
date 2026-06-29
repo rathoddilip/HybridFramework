@@ -32,15 +32,26 @@ public class DriverFactory {
 
     private static final Logger log = LogManager.getLogger(DriverFactory.class);
     private static final ThreadLocal<WebDriver> driverThread = new ThreadLocal<>();
+    private static final ThreadLocal<String> browserOverride = new ThreadLocal<>();
 
     private DriverFactory() {}
 
     /**
+     * Override browser for the current thread (e.g. from TestNG suite parameter).
+     * Falls back to config when not set.
+     */
+    public static void setBrowserOverride(String browser) {
+        if (browser != null && !browser.isBlank()) {
+            browserOverride.set(browser.trim().toLowerCase());
+        }
+    }
+
+    /**
      * Initialize WebDriver for the current thread.
-     * Browser & options read from config.
+     * Browser & options read from TestNG override, then config.
      */
     public static void initDriver() {
-        String browser  = ConfigManager.get("browser", "chrome").toLowerCase();
+        String browser = resolveBrowser();
         boolean headless = ConfigManager.getBoolean("headless");
         boolean remote   = ConfigManager.getBoolean("remote");
 
@@ -96,8 +107,17 @@ public class DriverFactory {
                 log.error("Error quitting WebDriver: {}", e.getMessage());
             } finally {
                 driverThread.remove();
+                browserOverride.remove();
             }
         }
+    }
+
+    private static String resolveBrowser() {
+        String override = browserOverride.get();
+        if (override != null && !override.isBlank()) {
+            return override;
+        }
+        return ConfigManager.get("browser", "chrome").toLowerCase();
     }
 
     // ── Private browser builders ──────────────────────────────────────────────
