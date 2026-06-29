@@ -13,13 +13,13 @@
     <name>Hybrid Automation Framework</name>
 
     <properties>
-        <java.version>25</java.version>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Core versions -->
-        <selenium.version>4.18.1</selenium.version>
+        <selenium.version>4.29.0</selenium.version>
         <testng.version>7.9.0</testng.version>
         <restassured.version>5.4.0</restassured.version>
         <allure.version>2.26.0</allure.version>
@@ -31,7 +31,7 @@
         <javafaker.version>1.0.2</javafaker.version>
         <owner.version>1.0.12</owner.version>
         <assertj.version>3.25.3</assertj.version>
-        <webdrivermanager.version>5.7.0</webdrivermanager.version>
+        <webdrivermanager.version>5.9.2</webdrivermanager.version>
         <extentreports.version>5.1.1</extentreports.version>
         <snakeyaml.version>2.2</snakeyaml.version>
         <poi.version>5.2.5</poi.version>

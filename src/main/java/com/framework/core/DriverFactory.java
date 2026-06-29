@@ -1,7 +1,6 @@
 package com.framework.core;
 
 import com.framework.config.ConfigManager;
-import io.github.bonigarcia.wdm.WebDriverManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openqa.selenium.WebDriver;
@@ -13,9 +12,21 @@ import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
 
+import java.io.BufferedInputStream;
+import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 /**
  * DriverFactory — Thread-safe WebDriver management using ThreadLocal.
@@ -123,26 +134,155 @@ public class DriverFactory {
     // ── Private browser builders ──────────────────────────────────────────────
 
     private static WebDriver createChromeDriver(boolean headless) {
-        WebDriverManager.chromedriver().setup();
         ChromeOptions options = new ChromeOptions();
         applyCommonChromeOptions(options, headless);
         return new ChromeDriver(options);
     }
 
     private static WebDriver createFirefoxDriver(boolean headless) {
-        WebDriverManager.firefoxdriver().setup();
         FirefoxOptions options = new FirefoxOptions();
-        if (headless) options.addArguments("--headless");
+        if (headless) options.addArguments("-headless");
         options.addArguments("--width=1920", "--height=1080");
         return new FirefoxDriver(options);
     }
 
     private static WebDriver createEdgeDriver(boolean headless) {
-        WebDriverManager.edgedriver().setup();
+        setupEdgeDriver();
         EdgeOptions options = new EdgeOptions();
-        if (headless) options.addArguments("--headless");
+        if (headless) options.addArguments("--headless=new");
         options.addArguments("--window-size=1920,1080");
         return new EdgeDriver(options);
+    }
+
+    /**
+     * Selenium Manager and WebDriverManager still hit deprecated msedgedriver.azureedge.net.
+     * Download the matching driver from msedgedriver.microsoft.com instead.
+     */
+    private static void setupEdgeDriver() {
+        if (System.getProperty("webdriver.edge.driver") != null) {
+            return;
+        }
+
+        try {
+            Path driverPath = downloadEdgeDriverFromMicrosoft();
+            System.setProperty("webdriver.edge.driver", driverPath.toString());
+            log.info("Edge driver ready at: {}", driverPath);
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Failed to resolve Edge WebDriver. Install Edge or check network access to "
+                            + "https://msedgedriver.microsoft.com", e);
+        }
+    }
+
+    private static Path downloadEdgeDriverFromMicrosoft() throws Exception {
+        String edgeVersion = detectInstalledEdgeVersion();
+        String driverVersion = fetchEdgeDriverVersion(edgeVersion);
+        String safeVersion = driverVersion.replaceAll("[^0-9.]", "");
+        String downloadUrl = "https://msedgedriver.microsoft.com/"
+                + safeVersion + "/edgedriver_win64.zip";
+
+        log.info("Downloading Edge driver {} from {}", safeVersion, downloadUrl);
+
+        Path cacheDir = Path.of(System.getProperty("java.io.tmpdir"), "edge-driver-cache", safeVersion);
+        Path driverExe = cacheDir.resolve("msedgedriver.exe");
+        if (Files.exists(driverExe)) {
+            return driverExe;
+        }
+
+        Files.createDirectories(cacheDir);
+        Path zipPath = cacheDir.resolve("edgedriver.zip");
+
+        try (InputStream in = new BufferedInputStream(URI.create(downloadUrl).toURL().openStream())) {
+            Files.copy(in, zipPath, StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        unzip(zipPath, cacheDir);
+        Files.deleteIfExists(zipPath);
+
+        if (!Files.exists(driverExe)) {
+            throw new IllegalStateException("msedgedriver.exe not found after extracting " + downloadUrl);
+        }
+
+        return driverExe;
+    }
+
+    private static String detectInstalledEdgeVersion() throws Exception {
+        String[] regCommands = {
+                "reg query HKCU\\Software\\Microsoft\\Edge\\BLBeacon /v version",
+                "reg query HKLM\\SOFTWARE\\Microsoft\\Edge\\BLBeacon /v version",
+                "reg query HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Edge\\BLBeacon /v version"
+        };
+
+        for (String command : regCommands) {
+            Process process = new ProcessBuilder("cmd", "/c", command)
+                    .redirectErrorStream(true)
+                    .start();
+
+            String output;
+            try (InputStream in = process.getInputStream()) {
+                output = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+            process.waitFor();
+
+            Matcher matcher = Pattern.compile("(\\d+\\.\\d+\\.\\d+\\.\\d+)").matcher(output);
+            if (matcher.find()) {
+                String version = matcher.group(1);
+                log.info("Detected installed Edge version: {}", version);
+                return version;
+            }
+        }
+
+        throw new IllegalStateException("Could not detect installed Edge version from registry");
+    }
+
+    private static String fetchEdgeDriverVersion(String edgeVersion) throws Exception {
+        String major = edgeVersion.split("\\.")[0];
+        String url = "https://msedgedriver.microsoft.com/LATEST_RELEASE_" + major + "_WINDOWS";
+
+        try (InputStream in = URI.create(url).toURL().openStream()) {
+            String driverVersion = new String(in.readAllBytes(), StandardCharsets.UTF_8).trim();
+            driverVersion = driverVersion.replaceAll("[^0-9.]", "");
+            if (!driverVersion.isBlank()) {
+                return driverVersion;
+            }
+        } catch (Exception ignored) {
+            log.warn("Could not resolve LATEST_RELEASE_{}_WINDOWS, using installed Edge version", major);
+        }
+
+        return edgeVersion;
+    }
+
+    private static void unzip(Path zipFile, Path targetDir) throws Exception {
+        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipFile))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                Path extracted = targetDir.resolve(entry.getName()).normalize();
+                if (!extracted.startsWith(targetDir)) {
+                    throw new SecurityException("Invalid zip entry: " + entry.getName());
+                }
+                if (entry.isDirectory()) {
+                    Files.createDirectories(extracted);
+                } else {
+                    Files.createDirectories(extracted.getParent());
+                    Files.copy(zis, extracted, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+
+        try (Stream<Path> walk = Files.walk(targetDir)) {
+            walk.filter(path -> path.getFileName().toString().equalsIgnoreCase("msedgedriver.exe"))
+                    .findFirst()
+                    .ifPresent(found -> {
+                        try {
+                            if (!found.equals(targetDir.resolve("msedgedriver.exe"))) {
+                                Files.copy(found, targetDir.resolve("msedgedriver.exe"),
+                                        StandardCopyOption.REPLACE_EXISTING);
+                            }
+                        } catch (Exception e) {
+                            throw new RuntimeException("Failed to normalize msedgedriver.exe location", e);
+                        }
+                    });
+        }
     }
 
     private static WebDriver createRemoteDriver(String browser, boolean headless) {
