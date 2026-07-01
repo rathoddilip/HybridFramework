@@ -24,7 +24,7 @@ on:
         options: [ chrome, firefox, edge ]
 
 env:
-  JAVA_VERSION: '25'
+  JAVA_VERSION: '17'
   ENV: ${{ github.event.inputs.environment || 'staging' }}
 
 jobs:

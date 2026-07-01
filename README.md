@@ -6,20 +6,21 @@ Repository: [github.com/rathoddilip/HybridFramework](https://github.com/rathoddi
 
 ## Tech Stack
 
-- Java 17
-- Maven
-- TestNG
-- REST Assured
-- Selenium WebDriver 4.x
-- Allure Reports
-- Jenkins Pipeline / GitHub Actions
+| Component | Version |
+|-----------|---------|
+| Java | 17 |
+| Maven | 3.x |
+| TestNG | 7.9 |
+| Selenium | 4.29 |
+| REST Assured | 5.4 |
+| Allure | 2.26 |
 
 ## Prerequisites
 
-- **JDK 17** (matches `pom.xml`)
+- **JDK 17** (required — matches `pom.xml`)
 - **Maven 3.x**
-- **Browsers** (for web / cross-browser tests): Chrome, Firefox, Microsoft Edge
-- Internet access (API tests and first-time Edge driver download)
+- **Browsers** for web tests: Chrome, Firefox, Microsoft Edge
+- Network access for API calls and first-time Edge WebDriver download
 
 ## Project Structure
 
@@ -39,11 +40,11 @@ src/main/resources/config
   staging.yaml             Staging placeholders
 
 src/test/java/com/tests
-  api/          API tests
-  web/          Web UI tests
+  api/          API tests (FixerraAuthAPITest)
+  web/          Web UI tests (LoginTest, SmokeTest)
 
 testng.xml                 Default suite — API + web tests
-testng-crossbrowser.xml    Parallel cross-browser web suite
+testng-crossbrowser.xml    Parallel cross-browser web suite (LoginTest)
 pom.xml                    Maven build and profiles
 Jenkinsfile                Jenkins pipeline
 automation-ci.yml          GitHub Actions workflow
@@ -52,34 +53,59 @@ docker-compose.yml         Optional Selenium Grid
 
 ## Local Setup
 
-1. Clone the repository and open the project folder (where `pom.xml` lives).
-2. Copy the local config template:
+### 1. Clone and open the project
 
-   ```bash
-   cp src/main/resources/config/dev.local.example.yaml src/main/resources/config/dev.local.yaml
-   ```
+After cloning [HybridFramework](https://github.com/rathoddilip/HybridFramework), open the folder that contains `pom.xml` (repository root).
 
-3. Edit `dev.local.yaml` with your real values (see **Configuration** below).
-4. Do **not** commit `dev.local.yaml` — it is already listed in `.gitignore`.
+> If your workspace has a parent folder (e.g. `AIAutomationTest/files`), always run Maven from the directory that contains `pom.xml`.
 
-### VS Code / Cursor (recommended)
+### 2. Create local config
 
-Set the project JDK to **17** so the IDE does not compile with a newer Java version:
+**Windows (PowerShell):**
+
+```powershell
+Copy-Item src\main\resources\config\dev.local.example.yaml src\main\resources\config\dev.local.yaml
+```
+
+**macOS / Linux:**
+
+```bash
+cp src/main/resources/config/dev.local.example.yaml src/main/resources/config/dev.local.yaml
+```
+
+### 3. Add your real values
+
+Edit `src/main/resources/config/dev.local.yaml` (see **Configuration** below).
+
+Do **not** commit `dev.local.yaml` — it is gitignored.
+
+### 4. Configure IDE Java runtime (VS Code / Cursor)
+
+Use **JDK 17** for the Java language server so the IDE does not compile with a newer JDK.
+
+Example `.vscode/settings.json` (adjust the path to your JDK 17 install):
 
 ```json
 {
-  "java.jdt.ls.java.home": "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.18.8-hotspot",
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.jdt.ls.java.home": "<path-to-jdk-17>",
   "java.configuration.runtimes": [
     {
       "name": "JavaSE-17",
-      "path": "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.18.8-hotspot",
+      "path": "<path-to-jdk-17>",
       "default": true
     }
   ]
 }
 ```
 
-Adjust the path to match your JDK 17 installation.
+Windows Temurin example:
+
+```text
+C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot
+```
+
+After changing JDK settings: **Developer: Reload Window** (`Ctrl+Shift+P`).
 
 ## Configuration
 
@@ -91,9 +117,10 @@ Use **separate** hosts for API and UI:
 |-----|---------|---------|
 | `api.baseUrl` | Backend auth API | `https://users-api.dev.example.com` |
 | `app.baseUrl` | Frontend application | `https://user-app.dev.example.com` |
-| `auth.origin` | CORS origin header | Same as app URL |
-| `auth.referer` | Referer header | Same as app URL |
-| `auth.partnerUrl` | Partner URL in OTP verify body | Same as app URL |
+| `auth.origin` | CORS Origin header | Same as app URL |
+| `auth.referer` | Referer header | Same as app URL + `/` |
+| `auth.partnerUrl` | OTP verify request body | Same as app URL |
+| `auth.consent` | OTP verify consent flag | `false` |
 
 ### Example `dev.local.yaml`
 
@@ -116,13 +143,11 @@ users:
     password: "000000"
 ```
 
-### Sensitive Data Policy
+### Override keys
 
-Do not commit real API URLs, app URLs, phone numbers, OTPs, tokens, cookies, or credentials.
+Values can be set in `dev.local.yaml`, Maven system properties (`-Dkey=value`), or environment variables.
 
-The committed `dev.yaml` contains **placeholders only**. Runtime values belong in `dev.local.yaml`, Maven system properties, environment variables, or CI secrets.
-
-Supported override keys:
+**Maven / config keys:**
 
 ```text
 api.baseUrl
@@ -137,12 +162,12 @@ browser
 headless
 remote
 gridUrl
+env
 allure.autoGenerate
 allure.autoOpen
-env
 ```
 
-Environment variable equivalents use uppercase and underscores, for example:
+**Environment variables (examples):**
 
 ```text
 API_BASE_URL
@@ -154,25 +179,34 @@ HEADLESS
 ENV
 ```
 
+### Sensitive data policy
+
+Do not commit real URLs, phone numbers, OTPs, tokens, or credentials.
+
+- Committed `dev.yaml` → placeholders only
+- Real values → `dev.local.yaml` (local) or CI secrets (Jenkins / GitHub Actions)
+
+## Test Suites
+
+| Suite file | What runs | Parallel |
+|------------|-----------|----------|
+| `testng.xml` (default) | API tests + `LoginTest` + `SmokeTest` | No |
+| `testng-crossbrowser.xml` | `LoginTest` on Chrome, Firefox, Edge | Yes (3 threads) |
+
 ## Run Tests
 
-All Maven commands must be run from the directory that contains `pom.xml`.
+Run all commands from the directory that contains `pom.xml`.
 
-### Full suite (default `testng.xml`)
-
-Runs API tests, then web tests:
+### Full suite (default)
 
 ```bash
 mvn test
 ```
 
-### Run by test group
+### By group
 
 ```bash
-# API tests only
 mvn test -Dgroups=api
-
-# Web tests only
 mvn test -Dgroups=web
 ```
 
@@ -184,9 +218,9 @@ mvn test -Dgroups=web -Dbrowser=firefox
 mvn test -Dgroups=web -Dbrowser=edge
 ```
 
-Supported values: `chrome` (default), `firefox`, `edge`.
+Default browser: `chrome`.
 
-### Headless browser
+### Headless
 
 ```bash
 mvn test -Dgroups=web -Dheadless=true
@@ -194,36 +228,34 @@ mvn test -Dgroups=web -Dheadless=true
 
 ### Cross-browser (parallel)
 
-Runs `LoginTest` on Chrome, Firefox, and Edge **in parallel** using `testng-crossbrowser.xml`:
-
 ```bash
 mvn test -Pcrossbrowser
 ```
 
-Alternative (without Maven profile):
+Equivalent:
 
 ```bash
 mvn test -Dsurefire.suiteXmlFiles=testng-crossbrowser.xml
 ```
 
-**Note:** Do not run `mvn testng-crossbrowser.xml` — that is not valid Maven syntax.
-
-### Maven profiles (environment)
-
-| Profile | Command | Config file |
-|---------|---------|-------------|
-| `dev` (default) | `mvn test` | `config/dev.yaml` + `dev.local.yaml` |
-| `staging` | `mvn test -Pstaging` | `config/staging.yaml` |
-| `prod` | `mvn test -Pprod` | `config/prod.yaml` (if present) |
-| `crossbrowser` | `mvn test -Pcrossbrowser` | Uses `testng-crossbrowser.xml` |
-
-Combine profiles and groups as needed:
+Cross-browser with a specific environment:
 
 ```bash
-mvn test -Pstaging -Dgroups=api
+mvn test -Pcrossbrowser,staging
 ```
 
-### Optional: Selenium Grid
+**Invalid:** `mvn testng-crossbrowser.xml` — Maven does not accept a suite file as a goal.
+
+### Maven profiles
+
+| Profile | Command | Effect |
+|---------|---------|--------|
+| `dev` (default) | `mvn test` | Loads `config/dev.yaml` + optional `dev.local.yaml` |
+| `staging` | `mvn test -Pstaging` | Loads `config/staging.yaml` |
+| `prod` | `mvn test -Pprod` | Sets `-Denv=prod` (add `config/prod.yaml` when needed) |
+| `crossbrowser` | `mvn test -Pcrossbrowser` | Runs `testng-crossbrowser.xml` |
+
+### Selenium Grid (optional)
 
 ```bash
 docker-compose up -d
@@ -232,58 +264,66 @@ mvn test -Dgroups=web -Dremote=true -Dbrowser=chrome
 
 ## Allure Report
 
-Generate a static Allure report:
+Generate static report:
 
 ```bash
 mvn allure:report -DskipTests
 ```
 
-Static report path:
+Open:
 
 ```text
 target/site/allure-maven-plugin/index.html
 ```
 
-Serve the report in a browser:
+Serve in browser:
 
 ```bash
 mvn allure:serve -DskipTests
 ```
 
-Test results are written to `target/allure-results/` after each run.
+Raw results: `target/allure-results/`
 
 ## Troubleshooting
 
 ### `There is no POM in this directory`
 
-Run Maven from the folder that contains `pom.xml`, not the parent repo root.
+```text
+Run Maven from the folder that contains pom.xml.
+Wrong:  D:\AIAutomationTest
+Right:  D:\AIAutomationTest\files   (if using a nested layout)
+Right:  <clone-root>                (GitHub repo root)
+```
 
-### `class file version 69.0` / Java version mismatch
+### `class file version 69.0` (Java mismatch)
 
-The project targets **Java 17**. If VS Code or another tool compiles with Java 21+, delete stale classes and re-run with Maven:
+Project targets **Java 17**. Stale classes may have been built with a newer JDK.
 
-```bash
-# PowerShell
+**PowerShell:**
+
+```powershell
 Remove-Item -Recurse -Force target\classes, target\test-classes -ErrorAction SilentlyContinue
 mvn test
 ```
 
-Also configure your IDE to use JDK 17 (see **Local Setup**).
+Set IDE to JDK 17 (see **Local Setup**) and reload the window.
 
-### Edge WebDriver download fails
+### Edge WebDriver fails
 
-Edge driver is downloaded automatically from `msedgedriver.microsoft.com` (the old `azureedge.net` CDN is deprecated). Ensure:
+Edge driver is resolved from [msedgedriver.microsoft.com](https://msedgedriver.microsoft.com) (not the deprecated `azureedge.net` CDN).
 
-- Microsoft Edge is installed
-- Network access to `msedgedriver.microsoft.com` is allowed
+Requirements:
 
-The driver is cached under your system temp folder after the first successful download.
+- Microsoft Edge installed
+- Network access to `msedgedriver.microsoft.com`
+
+Driver is cached under the system temp folder after the first successful download.
 
 ### `mvn clean` fails on `allure-serve.log`
 
-Stop any running Allure server, delete the locked file, then rebuild:
+Stop the Allure server, then:
 
-```bash
+```powershell
 Remove-Item target\allure-serve.log -Force -ErrorAction SilentlyContinue
 mvn compile test
 ```
@@ -292,15 +332,17 @@ mvn compile test
 
 ### GitHub Actions
 
-Workflow file: `automation-ci.yml`
+File: `automation-ci.yml`
 
-- Runs on push/PR to `main` / `develop`
-- Supports manual dispatch with environment and browser selection
+- Triggers: push/PR to `main`, schedule, manual dispatch
+- Manual inputs: environment (`dev` / `staging` / `prod`), browser (`chrome` / `firefox` / `edge`)
 - Publishes Allure artifacts
+
+Use **JDK 17** in the workflow to match `pom.xml`.
 
 ### Jenkins
 
-The `Jenkinsfile` expects these Jenkins secret text credentials:
+Required secret text credentials:
 
 ```text
 automation-api-base-url
@@ -312,26 +354,21 @@ automation-mobile
 automation-otp
 ```
 
-Jenkins job setup:
+Setup:
 
-1. Install plugins: Git, Pipeline, JUnit, Allure Jenkins Plugin.
-2. Configure tools: **JDK 17**, Maven, Allure Commandline.
-3. Create a Pipeline job.
-4. Select **Pipeline script from SCM**.
-5. Set repository URL and branch.
-6. Set script path to `Jenkinsfile`.
-7. Add the credentials listed above in Jenkins Credentials.
-8. Build with parameters.
+1. Plugins: Git, Pipeline, JUnit, Allure Jenkins Plugin
+2. Tools: **JDK 17**, Maven, Allure Commandline
+3. Pipeline job → **Pipeline script from SCM** → script path: `Jenkinsfile`
+4. Add credentials above
 
-The pipeline publishes:
+Published artifacts:
 
-- JUnit results from `target/surefire-reports/TEST-*.xml`
-- Allure results from `target/allure-results`
-- Archived test artifacts from `target/surefire-reports/**` and `target/allure-results/**`
+- JUnit: `target/surefire-reports/TEST-*.xml`
+- Allure: `target/allure-results`
 
 ## Git Safety
 
-Before committing, verify no secrets are staged:
+Before every commit:
 
 ```bash
 git status
@@ -341,5 +378,5 @@ git diff --cached
 Never commit:
 
 - `src/main/resources/config/*.local.yaml`
-- `target/` (may contain tokens in test reports)
-- `.env` files or credentials
+- `target/` (reports may contain JWT tokens)
+- `.env` or credential files
